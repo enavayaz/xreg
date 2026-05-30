@@ -201,14 +201,48 @@ def add_gauss_noise(
 # Generate CORRELATED trajectories
 # ============================================================================
 
-def sph_correlated_trjs(lon_max, lat_max, n_trj=30, n_points=40, noise_std=0.03, mean_curve='Else'):
+def sph_correlated_trjs(lon_max, lat_max, n_trj=30, n_points=40, noise_std=0.03,
+                        mean_curve='Sin', correlation=0.95):
     """
-    Generate highly correlated trajectories.
-    Lower noise_std = higher correlation = ridge should help more.
+    Generate highly correlated trajectories by perturbing a shared template
+    with temporally correlated (AR(1)) Gaussian noise mapped to the sphere
+    via the exponential map.
 
-    Try: noise_std = 0.02 (very high correlation)
-         noise_std = 0.05 (moderate correlation)
-         noise_std = 0.10 (low correlation - like hurricanes)
+    The shared template induces between-trajectory correlation. Under the
+    tangent-space approximation, this correlation is:
+
+        rho ~ var_template / (var_template + var_noise)
+
+    where var_noise = noise_std^2 / (1 - correlation^2) is the stationary
+    AR(1) variance.  For noise_std=0.05, correlation=0.95, and typical
+    template variance of order 0.1-0.3 on the unit sphere, this gives rho
+    approximately in the range 0.80-0.95.
+
+    Lower noise_std or higher correlation => higher rho => ridge helps more.
+    Try: noise_std = 0.02 (very high correlation, rho > 0.90)
+         noise_std = 0.05 (moderate-high correlation, rho ~ 0.80)
+         noise_std = 0.10 (lower correlation - like hurricanes)
+
+    Parameters
+    ----------
+    lon_max : float
+        Maximum longitude range for template generation.
+    lat_max : float
+        Maximum latitude range for template generation.
+    n_trj : int
+        Number of trajectories to generate.
+    n_points : int
+        Number of time points per trajectory.
+    noise_std : float
+        Individual within-trajectory noise standard deviation.
+        Controls both noise magnitude and, via var_noise, the
+        between-trajectory correlation rho.
+    mean_curve : str
+        Template shape: 'Geo' (geodesic), 'Sin' (sinusoidal), or
+        anything else for a random Bezier curve.
+    correlation : float
+        Within-trajectory AR(1) temporal correlation coefficient.
+        Higher values produce smoother individual tracks.
     """
     from morphomatics.manifold import Sphere
     M = Sphere()
@@ -216,15 +250,15 @@ def sph_correlated_trjs(lon_max, lat_max, n_trj=30, n_points=40, noise_std=0.03,
     if mean_curve == 'Geo':
         start_point, end_point = np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0])
         template = np.array([M.metric.geopoint(start_point, end_point, t) for t in np.linspace(0, 1, n_points)])
-    elif mean_curve == 'Poly':
-        template =bez_sph(n_points)
-    else:  # perturbated sine curve
+    elif mean_curve == 'Sin':  # perturbated sine curve
         n_template = n_points
         x_template = np.linspace(0, lon_max, n_template)
         y_max = np.sin(lat_max)
         y_template = 0.5 * y_max * np.sin(np.pi * x_template / lon_max)
         z_template = map2D3D(x_template, y_template, uniform=True)
         template = np.array([z_template[0], z_template[1], z_template[2]]).T
+    else:
+        template = bez_sph(n_points)
     # Generate correlated trajectories
     Y = []
     for i in range(n_trj):
@@ -244,9 +278,12 @@ def sph_correlated_trjs(lon_max, lat_max, n_trj=30, n_points=40, noise_std=0.03,
             noise_v = np.random.normal(0, noise_std)
 
             if j > 0:
-                correlation = 0.95  # Smooth noise along trajectory with high correlation
-                noise_u = correlation * prev_noise_u + np.sqrt(1-correlation**2) * noise_u
-                noise_v = correlation * prev_noise_v + np.sqrt(1-correlation**2) * noise_v
+                # AR(1) temporal smoothing with coefficient `correlation` (default 0.95).
+                # Stationary variance = noise_std^2 / (1 - correlation^2).
+                # Combined with the shared template this yields between-trajectory
+                # correlation rho ~ var_template / (var_template + noise_std^2 / (1 - correlation^2))
+                noise_u = correlation * prev_noise_u + np.sqrt(1 - correlation ** 2) * noise_u
+                noise_v = correlation * prev_noise_v + np.sqrt(1 - correlation ** 2) * noise_v
 
             prev_noise_u, prev_noise_v = noise_u, noise_v
             noisy_trj[j] = M.metric.exp(p, noise_u * u + noise_v * v)
