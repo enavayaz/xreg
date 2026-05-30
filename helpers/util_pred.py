@@ -3,6 +3,7 @@ from numpy import linalg as lg
 import jax
 import jax.numpy as jnp
 import jax.lax as lax
+from jax import Array
 from morphomatics.manifold import Manifold
 from typing import Tuple, List
 from timeseries.reg import PolyRegression as PolyReg
@@ -40,7 +41,7 @@ def eval_poly_dc(M: Manifold, P: jnp.array, x: jnp.array) -> jnp.array:
     ev = jax.jit(lambda t: decasteljau(M, P, t)[0])
     return jax.vmap(ev)(x)
 
-def decasteljau(M: Manifold, P: jnp.array, t: float) -> Tuple[jnp.array, List[jnp.array]]:
+def decasteljau(M: Manifold, P: Array, t: float) -> Tuple[Array, List[Array]]:
     """Generalized de Casteljau algorithm
     :param M: manifold
     :param P: control points of curve beta

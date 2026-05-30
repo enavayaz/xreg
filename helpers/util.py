@@ -1,4 +1,7 @@
-# matplotlib.use('TkAgg')  # matplotlib.use("Agg")  # NOQA
+import matplotlib
+import matplotlib.pylab as plt
+from matplotlib.colors import LightSource
+matplotlib.use('TkAgg')  # matplotlib.use("Agg")  # NOQA
 import jax.numpy as jnp
 import numpy as np
 from pathlib import Path
@@ -6,45 +9,82 @@ from pathlib import Path
 eps = 1e-8
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "datasets"
 
-def visSphere(points_list, color_list, size=20, nice=True):
+
+def visSph(points_list, color_list, segment_list=None, size_list=None, intrinsic=True, surf=True):
     """
-    Visualize groups of points on the 2D-sphere
+    Visualize groups of points on the 2D-sphere.
+
+    Parameters
+    ----------
+    points_list : list of array-like, each (N, 3)
+        One entry per group; each entry is an array of 3D unit vectors.
+        Shapes (1, N, 3) are squeezed automatically.
+    color_list : list of color specs
+        One matplotlib color per group (str, hex, RGB tuple, …).
+    segment_list : list of bool/int, optional
+        One flag per group — if truthy, a polyline is drawn through the
+        group's points in the same color as its scatter. Defaults to
+        drawing a line only for the first group.
+    size_list : list of float, optional
+        Marker size (scatter `s`) per group. Defaults to 10 for all groups.
+    intrinsic : bool, default True
+        Whether to use the intrinsic SLERP interpolation. If False, Euclidean
+    surf : bool, default True
+        Whether to render the translucent sphere surface.
     """
-    import matplotlib.pyplot as plt
-    _ = plt.figure(figsize=(size, size))
+    _ = plt.figure(figsize=(20, 20))
     ax = plt.subplot(111, projection="3d")
-    #ax.set_aspect("auto")  # equal
     ax.set_box_aspect([1.0, 1.0, 1.0])
-    # draw sphere
-    if nice:
-        u = np.linspace(0, 2 * np.pi, 100)
-        v = np.linspace(0, np.pi, 100)
-        x = 1 * np.outer(np.cos(u), np.sin(v))
-        y = 1 * np.outer(np.sin(u), np.sin(v))
-        z = 1 * np.outer(np.ones(np.size(u)), np.cos(v))
+    ax.computed_zorder = False
 
-        # Create a light blue sphere with shading
-        ax.plot_surface(x, y, z, color='#E8F4F8', alpha=0.25,
-                        linewidth=0, antialiased=True, shade=True,
-                        lightsource=plt.matplotlib.colors.LightSource(azdeg=45, altdeg=45))
+    u = np.linspace(0, 2 * np.pi, 100)
+    v = np.linspace(0, np.pi, 100)
+    x = np.outer(np.cos(u), np.sin(v))
+    y = np.outer(np.sin(u), np.sin(v))
+    z = np.outer(np.ones_like(u), np.cos(v))
 
-        # Remove axes for cleaner look
-        ax.set_axis_off()
-        # Remove grid
-        ax.grid(False)
+    ls = plt.matplotlib.colors.LightSource(azdeg=45, altdeg=45)
+    ax.plot_surface(x, y, z, color='#E8F4F8', alpha=0.25,
+                    linewidth=0, antialiased=surf, shade=True, lightsource=ls)
+    ax.set_axis_off()
+    ax.grid(False)
+
+    n = len(points_list)
+    if segment_list is None:
+        draw_line = [i == 0 for i in range(n)]
     else:
-        u, v = np.meshgrid(np.linspace(0.0, 2 * np.pi, 40), np.linspace(0.0, np.pi, 20))
-        x, y, z = np.cos(u) * np.sin(v), np.sin(u) * np.sin(v), np.cos(v)
-        ax.plot_wireframe(x, y, z, color="grey", alpha=0.2)
-    #ax.set_axis_off() # Turn off the axis planes
-    # Set viewing angle
-    #ax.view_init(elev=20, azim=45)
-    # ax.set_title("")
-    for i in range(len(points_list)):
-        for points in points_list[i]:
-            points = np.array(points)
-            ax.scatter(points[0], points[1], points[2], s=10, color=color_list[i], marker=".")
-    plt.show(block=True)
+        draw_line = [bool(s) for s in segment_list]
+
+    for i in range(n):
+        pts = np.asarray(points_list[i])
+        s = size_list[i] if size_list is not None else 10
+        if pts.ndim == 3:
+            pts = pts.squeeze(0)
+
+        color = color_list[i]
+        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], s=s, color=color, marker=".")
+        if draw_line[i]:
+            if intrinsic:
+                for j in range(len(pts) - 1):
+                    arc = slerp_arc(pts[j], pts[j + 1])
+                    ax.plot(arc[:, 0], arc[:, 1], arc[:, 2], color=color, linewidth=1.0, alpha=0.7)
+            else:
+                ax.plot(pts[:, 0], pts[:, 1], pts[:, 2], color=color, linewidth=1.0, alpha=0.7)
+
+    plt.show()
+
+
+def slerp_arc(p1, p2, n=50):
+    """Interpolate a great-circle arc between two unit vectors."""
+    p1 = p1 / np.linalg.norm(p1)
+    p2 = p2 / np.linalg.norm(p2)
+    t = np.linspace(0, 1, n)
+    # SLERP
+    omega = np.arccos(np.clip(p1 @ p2, -1.0, 1.0))
+    if omega < 1e-10:
+        return np.outer(1 - t, p1) + np.outer(t, p2)  # nearly identical points
+    return (np.outer(np.sin((1 - t) * omega), p1) +
+            np.outer(np.sin(t * omega), p2)) / np.sin(omega)
 
 
 # Earth Science
@@ -136,7 +176,7 @@ def bez_sph(n_points):
     for i, t in enumerate(t_values):
         y[i] = sph_bez_curve_pt(t, P_normalized)
 
-    #visSphere([y, y], ['b', 'r'])
+    #visSph([y, y], ['b', 'r'])
     return y
 
 
