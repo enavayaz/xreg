@@ -13,7 +13,12 @@ Prediction](https://arxiv.org/abs/2411.18339.pdf)**
 ## Colab Notebook
 You can run the synthetic validation tests directly in your browser (ensure you clone the repository and add 
 the root directory to your system path to enable the modules):
+
+# Synthetic Validation Tests
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/enavayaz/xreg/blob/main/notebooks/synthetic_test.ipynb)
+
+# Hurricane Validation Tests
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/enavayaz/xreg/blob/main/notebooks/hur_test.ipynb)
 
 Note: If you encounter import errors, try Runtime → Disconnect and delete runtime, then re-run cells to get a fresh environment.
 
