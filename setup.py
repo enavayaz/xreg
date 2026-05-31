@@ -7,13 +7,13 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="mfreg",
+    name="xreg",
     version="0.1.0",
     author="Esfandiar Nava-Yazdani",
     description="Manifold Regression Framework for time-series prediction on Riemannian manifolds",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/enavayaz/mfreg",
+    url="https://github.com/enavayaz/xreg",
     packages=find_packages(include=["timeseries", "timeseries.*", "helpers", "helpers.*"]),
     classifiers=[
         "Development Status :: 3 - Alpha",

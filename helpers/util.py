@@ -222,3 +222,23 @@ def load_sph(name, target_dir=DEFAULT_DATA_DIR):
     data = np.load(path, allow_pickle=True)
     B, Y = data['B'], data['Y'].tolist()
     return B, [np.array(y) for y in Y]
+
+
+def save_hur(B, Y, name, target_dir=DEFAULT_DATA_DIR):
+    target_dir.mkdir(parents=True, exist_ok=True)
+    path = target_dir / f'{name}.npz'
+    np.savez(path, B=B, Y=np.array(Y, dtype=object))
+
+
+def load_hur(name, target_dir=DEFAULT_DATA_DIR):
+    path = target_dir / 'hur.npz'
+    if not path.exists():
+        raise FileNotFoundError(f'No file found at {path}')
+
+    data = np.load(path, allow_pickle=True)
+    subj, seq, ids, info = data['subj'], data['seq'], data['ids'], data['info']
+    Y = [seq[ids[i]:ids[i] + subj[i, 2], (7, 8, 9)] for i in range(166, 218)]
+    Y = [np.array(y) for y in Y]
+    path = target_dir / 'deg5_coeff.npz'
+    B = np.load(path, allow_pickle=True)['arr_0'][166:]
+    return B, Y
